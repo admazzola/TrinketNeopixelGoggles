@@ -76,7 +76,7 @@ void loop() {
 
 
  if(animationType <= 5){
-    // Colorfade wheels 
+    // Colorfade wheels - not working right 
 
       animationStepOffset = 50;
       animationStepDecay = 0;
@@ -87,17 +87,28 @@ void loop() {
      
        uint32_t c = 0;
        
+    
+     
+        
      for(i=0; i<16; i++) {
+      uint32_t c = 0;
+      if(((animationStep + i)  & 7  ) < 1 + (animationType % 6) ){
+            int subMode = (animationType % 6) ;
+            
+            int hue =   subMode * 60 + i*2 ;
 
-      
-       
-      if(((animationStep + i) & 7) < 2) c = color; // 4 pixels on...
- 
-       c >>= 3;                 // Color fader 
+           color = hueToColorHex(  hue    ) ;
+           
+           c = color; // 4 pixels on... 
+        
+        }
       
       pixels.setPixelColor(   i, c); // First eye
       pixels.setPixelColor(31-i, c); // Second eye (flipped)
      }
+
+
+       
      
    
      
@@ -157,26 +168,23 @@ void loop() {
    
   // Rainbow wheels   
 
-      animationStepOffset = 35 + (animationType % 6) * 5;
-      animationStepDecay = 2 + (animationType % 6) * 2 ;
+      animationStepOffset = 35 + (animationType % 6) * 1;
+      animationStepDecay = 2 + (animationType % 6) * 1 ;
  
 
         // colorIndex = animationType % 6 ;+
-         color = 0xc794b7;
+         //color = 0xc794b7;
    
-      
-        color = hueToColorHex(0.1) ;
-     
-
-     for(i=0; i< (animationStep % 16 ) ; i++) { 
-       // color ^= (animationType % 6); 
-       color <<= 2;                 // Color fader 
-     }
+         
         
-     for(i=0; i<16; i++) {  
+     for(i=0; i<16; i++) {
       uint32_t c = 0;
       if(((animationStep + i)  & 7  ) < 1 + (animationType % 6) ){
-        
+
+            int hue = animationStep + i*2  ;
+
+           color = hueToColorHex(  hue    ) ;
+           
            c = color; // 4 pixels on... 
         
         }
@@ -220,85 +228,99 @@ int getAnimationStepTime(){
   
 }
 
-uint32_t hueToColorHex(float hue)
-{  
+//this is working now 
+uint32_t hueToColorHex(int hue)
+{   
     
-   byte *r,*g,*b;
+  // byte *r,*g,*b; //declare pointers to bytes 
+  
 
-   HSV_to_RGB(hue,100.0,100.0,r,g,b);
+     uint8_t rgb_colors[3]; 
+
+      
+   getRGB(hue, 225, 125, rgb_colors);
  
+  
 
-    return colorBytesToHex(&r,&b,&g);
+   return colorBytesToHex(rgb_colors[0],rgb_colors[1],rgb_colors[2]); //pass the values 
 
     
 }
 
-uint32_t colorBytesToHex(byte r,byte g,byte b){
-  
-  return  (r << 16 ) | (g << 8) | b;   
+//this works now when the ints are big enough to be shifted 
+uint32_t colorBytesToHex(uint32_t r,uint32_t g,uint32_t b){
+   
+ 
+    return  (r << 16  | (g << 8) | b  ); 
   
 }
 
 
 
-void HSV_to_RGB(float h, float s, float v, byte *r, byte *g, byte *b)
-{
-  int i;
-  float f,p,q,t;
-  
-  h = max(0.0, min(360.0, h));
-  s = max(0.0, min(100.0, s));
-  v = max(0.0, min(100.0, v));
-  
-  s /= 100;
-  v /= 100;
+void getRGB(uint8_t hue, uint8_t sat, uint8_t val, uint8_t colors[3]) { 
+  /* convert hue, saturation and brightness ( HSB/HSV ) to RGB
+     The dim_curve is used only on brightness/value and on saturation (inverted).
+     This looks the most natural.      
+  */
 
-   s = 1.0;
-   v = 1.0;
-   
-  if(s == 0) {
-    // Achromatic (grey)
-    *r = *g = *b = round(v*255);
-    return;
-  }
-  
-  
+ // val = dim_curve[val];
+  //sat = 255-dim_curve[255-sat];
 
-  h /= 60; // sector 0 to 5
-  i = floor(h);
-  f = h - i; // factorial part of h
-  p = v * (1 - s);
-  q = v * (1 - s * f);
-  t = v * (1 - s * (1 - f));
-  switch(i) {
+  hue =   hue % 255;
+  
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t base;
+
+  if (sat == 0) { // Acromatic color (gray). Hue doesn't mind.
+    colors[0]=val;
+    colors[1]=val;
+    colors[2]=val;  
+  } else  { 
+
+    base = ((255 - sat) * val)>>8;
+
+    switch(hue/60) {
     case 0:
-      *r = round(255*v);
-      *g = round(255*t);
-      *b = round(255*p);
-      break;
+        r = val;
+        g = (((val-base)*hue)/60)+base;
+        b = base;
+    break;
+
     case 1:
-      *r = round(255*q);
-      *g = round(255*v);
-      *b = round(255*p);
-      break;
+        r = (((val-base)*(60-(hue%60)))/60)+base;
+        g = val;
+        b = base;
+    break;
+
     case 2:
-      *r = round(255*p);
-      *g = round(255*v);
-      *b = round(255*t);
-      break;
+        r = base;
+        g = val;
+        b = (((val-base)*(hue%60))/60)+base;
+    break;
+
     case 3:
-      *r = round(255*p);
-      *g = round(255*q);
-      *b = round(255*v);
-      break;
+        r = base;
+        g = (((val-base)*(60-(hue%60)))/60)+base;
+        b = val;
+    break;
+
     case 4:
-      *r = round(255*t);
-      *g = round(255*p);
-      *b = round(255*v);
-      break;
-    default: // case 5:
-      *r = round(255*v);
-      *g = round(255*p);
-      *b = round(255*q);
+        r = (((val-base)*(hue%60))/60)+base;
+        g = base;
+        b = val;
+    break;
+
+    case 5:
+        r = val;
+        g = base;
+        b = (((val-base)*(60-(hue%60)))/60)+base;
+    break;
     }
+
+    colors[0]=r;
+    colors[1]=g;
+    colors[2]=b; 
+  }   
 }
